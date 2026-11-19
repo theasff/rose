@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>yedi gül</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  body.imlec-gizli { cursor: none; }
+
+  #yazi {
+    position: fixed; left: 0; right: 0; text-align: center;
+    color: rgba(255, 255, 255, 0.9);
+    font-family: "Segoe UI Light", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-weight: 300; letter-spacing: 0.14em;
+    opacity: 0; transition: opacity 1.8s ease;
+    pointer-events: none; user-select: none; padding: 0 6vw;
+    text-wrap: balance;
+  }
+  #yazi.gorunur { opacity: 1; }
+</style>
+</head>
+<body>
+<canvas id="sahne"></canvas>
+<div id="yazi"></div>
+
+<script>
+/* =====================================================================
+   YEDİ GÜL — kasımpatı animasyonunun gül versiyonu
+   Mimari orijinalle aynı: tek zaman çizelgesi, ciz(zaman, dt)
+   ===================================================================== */
+
+/* ---------- 1. Ayarlar ve renkler ---------- */
+const AZALTILMIS_HAREKET = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+const AYARLAR = {
+  parilti: AZALTILMIS_HAREKET ? 36 : 80,
+  sapSuresi: 1.7,
+  tomurSuresi: 1.0,
+  acilmaSuresi: 3.5,
+  salinim: AZALTILMIS_HAREKET ? 0.35 : 1,
+  parcacikHizi: AZALTILMIS_HAREKET ? 0.5 : 1
+};
+
+// bordo, koyu kırmızı, zengin gül kırmızısı, yumuşak kırmızı, vurgu
+const GUL = ['#4A0715', '#8B1028', '#C51F3A', '#E85D70', '#FF9BA8'];
+const YESIL = ['#071a0b', '#123a1b', '#225c2c', '#3f7f45'];
+
+const parametreler = new URLSearchParams(location.search);
+const kayitModu = parametreler.has('kayit');
+const yazi = (parametreler.get('text') || '').slice(0, 80);
+const yaziKutusu = document.getElementById('yazi');
+yaziKutusu.textContent = yazi;
+
+const tuval = document.getElementById('sahne');
+const ctx = tuval.getContext('2d');
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+let W = 0, H = 0, olcek = 1, merkezX = 0, merkezY = 0;
+
+/* ---------- 2. Yardımcı fonksiyonlar ---------- */
+const sinirla = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const yumusak = x => 1 - Math.pow(1 - x, 3);
+const akici = x => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const yayli = x => 1 + 2.2 * Math.pow(x - 1, 3) + 1.2 * Math.pow(x - 1, 2);
+const ilerleme = (t, bas, sure) => sinirla((t - bas) / sure);
+let tohum = 7;
+const rastgele = () => (tohum = (tohum * 16807) % 2147483647) / 2147483647;
+
+function renkKaristir(a, b, k) {
+  const x = parseInt(a.slice(1), 16), y = parseInt(b.slice(1), 16);
+  const c = s => Math.round(((x >> s) & 255) * (1 - k) + ((y >> s) & 255) * k);
+  return 'rgb(' + c(16) + ',' + c(8) + ',' + c(0) + ')';
+}
+function renkAlfa(hex, a) {
+  const x = parseInt(hex.slice(1), 16);
+  return 'rgba(' + ((x >> 16) & 255) + ',' + ((x >> 8) & 255) + ',' + (x & 255) + ',' + a + ')';
+}
+function tuvalYap(w, h) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  return c;
+}
+
+/* ---------- 3. Gül yaprağı (taç yaprağı) resimleri ----------
+   Geniş, yuvarlak, kadehi andıran yaprak. Tabanı koyu, ucu açık,
+   dudağı (kıvrık kenarı) pembe vurgulu. Başlangıç noktası taban. */
+const YAP_UZ = 240, YAP_EN = 224, YAP_BAS = 32, YAP_ORTA = 112, YAP_BOY = 176, YAP_YARI = 84;
+const ASIMLAR = [0.88, 1, 1.12];       // üç farklı asimetrik şekil
+const TONLAR = [0, 0.33, 0.66, 1];     // dörder ton: koyudan açığa
+
+const yapX = x => YAP_BAS + x * YAP_BOY;
+const yapY = y => YAP_ORTA + y * YAP_YARI;
+
+function gulYaprakYolu(asim) {
+  const p = new Path2D();
+  p.moveTo(yapX(0), yapY(0));
+  p.bezierCurveTo(yapX(0.14), yapY(-0.34), yapX(0.28), yapY(-0.96), yapX(0.62), yapY(-1));
+  p.bezierCurveTo(yapX(0.88), yapY(-1.03), yapX(1.0), yapY(-0.6), yapX(0.98), yapY(0));
+  p.bezierCurveTo(yapX(1.0), yapY(0.6 * asim), yapX(0.88), yapY(1.03 * asim), yapX(0.62), yapY(asim));
+  p.bezierCurveTo(yapX(0.28), yapY(0.96 * asim), yapX(0.14), yapY(0.34 * asim), yapX(0), yapY(0));
+  p.closePath();
+  return p;
+}
+
+function gulYaprakCiz(sekil, ton) {
+  const c = tuvalYap(YAP_UZ, YAP_EN);
+  const g = c.getContext('2d');
+  const yol = gulYaprakYolu(ASIMLAR[sekil]);
+
+  const grad = g.createRadialGradient(yapX(0.05), YAP_ORTA, 4, yapX(0.05), YAP_ORTA, YAP_BOY * 1.02);
+  grad.addColorStop(0, GUL[0]);
+  grad.addColorStop(0.28, renkKaristir(GUL[0], GUL[1], 0.55 + ton * 0.4));
+  grad.addColorStop(0.62, renkKaristir(GUL[1], GUL[2], 0.2 + ton * 0.6));
+  grad.addColorStop(0.92, renkKaristir(GUL[2], GUL[3], ton * 0.42));
+  grad.addColorStop(1, renkKaristir(GUL[2], GUL[3], 0.12 + ton * 0.45));
+
+  g.shadowColor = 'rgba(15,0,5,0.78)';
+  g.shadowBlur = 11;
+  g.fillStyle = grad;
+  g.fill(yol);
+  g.shadowBlur = 0;
+
+  g.save();
+  g.clip(yol);
+
+  // taban gölgesi
+  const golge = g.createRadialGradient(yapX(0), YAP_ORTA, 0, yapX(0), YAP_ORTA, YAP_BOY * 0.42);
+  golge.addColorStop(0, 'rgba(20,0,8,0.65)');
+  golge.addColorStop(1, 'rgba(20,0,8,0)');
+  g.fillStyle = golge;
+  g.fillRect(0, 0, YAP_UZ, YAP_EN);
+
+  // damarlar
+  g.lineWidth = 1.6;
+  for (let i = -2; i <= 2; i++) {
+    g.beginPath();
+    g.moveTo(yapX(0.03), yapY(0));
+    g.quadraticCurveTo(yapX(0.5), yapY(i * 0.1), yapX(0.93), yapY(i * 0.34));
+    g.strokeStyle = 'rgba(20,0,8,0.07)';
+    g.stroke();
+  }
+
+  // kıvrık dudak: ucun kenarında ışık
+  const dudak = g.createLinearGradient(yapX(0.45), 0, yapX(1), 0);
+  dudak.addColorStop(0, renkAlfa(GUL[4], 0));
+  dudak.addColorStop(1, renkAlfa(GUL[4], 0.14 + ton * 0.24));
+  g.lineWidth = 12;
+  g.strokeStyle = dudak;
+  g.stroke(yol);
+
+  // dudağın hemen altında ince gölge çizgisi (kıvrımın derinliği)
+  g.lineWidth = 2;
+  g.strokeStyle = 'rgba(30,0,10,0.28)';
+  g.beginPath();
+  g.moveTo(yapX(0.55), yapY(-0.78));
+  g.bezierCurveTo(yapX(0.78), yapY(-0.82), yapX(0.9), yapY(-0.5), yapX(0.9), yapY(0));
+  g.bezierCurveTo(yapX(0.9), yapY(0.5 * ASIMLAR[sekil]), yapX(0.78), yapY(0.82 * ASIMLAR[sekil]), yapX(0.55), yapY(0.78 * ASIMLAR[sekil]));
+  g.stroke();
+
+  g.restore();
+  return c;
+}
+const gulYapraklari = ASIMLAR.map((_, s) => TONLAR.map(t => gulYaprakCiz(s, t)));
+
+/* ---------- 4. Tomurcuk resmi ----------
+   Yandan görünen kapalı gül tomurcuğu (sol taban, sağ uç). */
+const TOM_UZ = 210, TOM_EN = 150, TOM_BAS = 18, TOM_ORTA = 75, TOM_BOY = 176;
+function tomurcukResmiYap() {
+  const c = tuvalYap(TOM_UZ, TOM_EN);
+  const g = c.getContext('2d');
+  const yol = new Path2D();
+  yol.moveTo(18, 75);
+  yol.bezierCurveTo(18, 28, 80, 6, 130, 22);
+  yol.bezierCurveTo(170, 34, 190, 62, 194, 75);
+  yol.bezierCurveTo(190, 88, 170, 116, 130, 128);
+  yol.bezierCurveTo(80, 144, 18, 122, 18, 75);
+  yol.closePath();
+
+  const grad = g.createLinearGradient(0, 8, 0, 142);
+  grad.addColorStop(0, renkKaristir(GUL[2], GUL[3], 0.25));
+  grad.addColorStop(0.35, GUL[2]);
+  grad.addColorStop(0.72, GUL[1]);
+  grad.addColorStop(1, GUL[0]);
+  g.shadowColor = 'rgba(15,0,5,0.7)';
+  g.shadowBlur = 8;
+  g.fillStyle = grad;
+  g.fill(yol);
+  g.shadowBlur = 0;
+
+  g.save();
+  g.clip(yol);
+  // sarmal yaprak kenarları
+  g.lineWidth = 2.4;
+  g.strokeStyle = 'rgba(20,0,8,0.4)';
+  g.beginPath(); g.moveTo(24, 118); g.bezierCurveTo(74, 104, 140, 64, 198, 76); g.stroke();
+  g.beginPath(); g.moveTo(24, 36); g.bezierCurveTo(84, 50, 142, 94, 192, 78); g.stroke();
+  g.lineWidth = 1.6;
+  g.strokeStyle = renkAlfa(GUL[4], 0.3);
+  g.beginPath(); g.moveTo(24, 112); g.bezierCurveTo(74, 98, 140, 58, 198, 72); g.stroke();
+  g.beginPath(); g.moveTo(24, 30); g.bezierCurveTo(84, 44, 142, 88, 192, 74); g.stroke();
+  // üst ışık, taban gölgesi
+  const isik = g.createLinearGradient(0, 0, 0, TOM_EN);
+  isik.addColorStop(0, renkAlfa(GUL[4], 0.42));
+  isik.addColorStop(0.4, renkAlfa(GUL[4], 0));
+  g.fillStyle = isik; g.fillRect(0, 0, TOM_UZ, TOM_EN);
+  const taban = g.createLinearGradient(0, 0, TOM_UZ, 0);
+  taban.addColorStop(0, 'rgba(10,0,4,0.55)');
+  taban.addColorStop(0.4, 'rgba(10,0,4,0)');
+  g.fillStyle = taban; g.fillRect(0, 0, TOM_UZ, TOM_EN);
+  g.restore();
+  return c;
+}
+const tomurcukResmi = tomurcukResmiYap();
+
+/* ---------- 5. Işık resimleri (hale, parçacıklar, ortam) ---------- */
+function isikYap(renk, boyut, guc) {
+  const c = tuvalYap(boyut, boyut);
+  const g = c.getContext('2d');
+  const r = boyut / 2;
+  const grad = g.createRadialGradient(r, r, 0, r, r, r);
+  const rgba = a => renk.replace('rgb', 'rgba').replace(')', ',' + a + ')');
+  for (let i = 0; i <= 10; i++) {
+    const t = i / 10;
+    grad.addColorStop(t, rgba(i === 0 ? 1 : guc * Math.exp(-t * t * 5) * (1 - t)));
+  }
+  g.fillStyle = grad;
+  g.fillRect(0, 0, boyut, boyut);
+  return c;
+}
+const haleIsigi = isikYap(renkKaristir(GUL[1], GUL[2], 0.45), 256, 1);
+const ortamIsigi = isikYap(renkKaristir(GUL[0], GUL[1], 0.55), 256, 0.9);
+const vurguIsigi = isikYap(renkKaristir(GUL[3], GUL[4], 0.6), 128, 0.8);
+const ISIK_TURLERI = [
+  isikYap(renkKaristir('#ffcf6e', '#ffffff', 0.35), 64, 0.5),   // sıcak altın
+  isikYap(renkKaristir(GUL[4], '#ffffff', 0.25), 64, 0.45),     // pembe
+  isikYap(renkKaristir(GUL[3], GUL[2], 0.3), 64, 0.5)           // kırmızı
+];
+
+/* ---------- 6. Buket: yedi gül ----------
+   Çizim sırası arkadan öne. bas = gülün merkezi, taban = sapın başladığı yer.
+   gecikme: sapın büyümeye başlama zamanı (sn). egri: sap eğriliği. */
+const BUKET = [
+  // üst / orta üçlü
+  { taban: [0.5, 58],  bas: [1, -43],   yaricap: 14.5,   gecikme: 0,    egim: 0.12,  faz: 0,   egri: [2.5, -2],   tonKaydir: 0.2 },
+  { taban: [-1.5, 58], bas: [-17, -27], yaricap: 14,   gecikme: 0.7,  egim: -0.3,  faz: 1.3, egri: [-3, 2],     tonKaydir: -0.3 },
+  { taban: [1.5, 58],  bas: [19, -25],  yaricap: 14.2, gecikme: 0.9,  egim: 0.35,  faz: 2.6, egri: [3, -2.5],   tonKaydir: 0.4 },
+  // sol ve sağ dış güller
+  { taban: [-3, 58],   bas: [-33, -7],  yaricap: 13.2,   gecikme: 1.1,  egim: -0.5,  faz: 3.9, egri: [-1.5, 3],   tonKaydir: -0.1 },
+  { taban: [3, 58],    bas: [33, -5],   yaricap: 13.5, gecikme: 1.3,  egim: 0.45,  faz: 5.2, egri: [1.5, -3],   tonKaydir: 0.1 },
+  // öndeki iki gül (sol ve sağ)
+  { taban: [-0.8, 58], bas: [-12, -9],  yaricap: 14.5, gecikme: 0.3,  egim: -0.15, faz: 0.8, egri: [-2, 1.5],   tonKaydir: 0.0 },
+  { taban: [1, 58],    bas: [13, -8],   yaricap: 14.5, gecikme: 0.5,  egim: 0.2,   faz: 4.4, egri: [2, -1.5],   tonKaydir: -0.2 }
+];
+
+// katmanlar: dıştan içe. bas/sure: açılma zamanı (iç önce açılır, dış sonra yayılır)
+const KATMANLAR = [
+  { n: 5, boy: 1.00, en: 0.60, taban: 0.10, bas: 0.46, sure: 0.50, ton: 0.70 },
+  { n: 6, boy: 0.82, en: 0.50, taban: 0.09, bas: 0.34, sure: 0.42, ton: 0.52 },
+  { n: 5, boy: 0.64, en: 0.41, taban: 0.08, bas: 0.22, sure: 0.38, ton: 0.34 },
+  { n: 4, boy: 0.47, en: 0.33, taban: 0.06, bas: 0.10, sure: 0.36, ton: 0.16 },
+  { n: 3, boy: 0.32, en: 0.26, taban: 0.04, bas: 0.00, sure: 0.34, ton: 0.00 }
+];
+const GUL_BASIKLIK = 0.86;
+const SARMAL_SAYISI = 5;
+const SARMAL_RENK = Array.from({ length: SARMAL_SAYISI }, (_, i) => renkKaristir(GUL[0], GUL[2], 0.2 + i * 0.17));
+const SARMAL_ISIK = renkAlfa(GUL[4], 0.35);
+
+function gulPetalleriOlustur(c) {
+  const liste = [];
+  KATMANLAR.forEach((k, l) => {
+    const faz = l * 0.9 + c.faz;
+    for (let i = 0; i < k.n; i++) {
+      const tonSayi = k.ton * 3 + c.tonKaydir * 1.2 + (rastgele() - 0.5) * 1.2;
+      liste.push({
+        aci: faz + i * (Math.PI * 2 / k.n) + (rastgele() - 0.5) * 0.5,
+        girdap: (4 - l) / 4 * 0.7,
+        taban: k.taban,
+        boy: k.boy * (0.92 + rastgele() * 0.14),
+        en: k.en * (0.9 + rastgele() * 0.2),
+        ton: Math.max(0, Math.min(3, Math.round(tonSayi))),
+        sekil: Math.floor(rastgele() * 3),
+        acilis: k.bas + rastgele() * 0.05,
+        sure: k.sure
+      });
+    }
+  });
+  return liste;     // dıştan içe: önce dış katman çizilir, iç katman üstüne biner
+}
+
+BUKET.forEach(c => {
+  const [bx] = c.taban, [hx, hy] = c.bas;
+  c.kontrol = [
+    [bx + (hx - bx) * 0.05 + c.egri[0], 58 - (58 - hy) * 0.4],
+    [hx - (hx - bx) * 0.25 + c.egri[1], hy + (58 - hy) * 0.3]
+  ];
+  c.sapBas = c.gecikme;
+  c.tomurBas = c.sapBas + AYARLAR.sapSuresi * 0.9;
+  c.cicekBas = c.tomurBas + AYARLAR.tomurSuresi * 0.85;
+  c.yapraklar = gulPetalleriOlustur(c);
+  c.x = hx; c.y = hy; c.donme = 0; c.eksenX = 0; c.eksenY = -1;
+});
+const SON_ACILMA = Math.max(...BUKET.map(c => c.cicekBas)) + AYARLAR.acilmaSuresi;
+const ILK_ACILMA = Math.min(...BUKET.map(c => c.cicekBas));
+
+/* ---------- 7. Yeşil yaprak: tırtıklı gül yaprakçığı ---------- */
+const yesilYaprak = new Path2D(), yaprakDamari = new Path2D();
+(function () {
+  const ust = [], alt = [], N = 96, DIS = 11;
+  for (let i = 0; i <= N; i++) {
+    const t = i / N;
+    const govde = t < 0.07 ? 0.012 : Math.pow(Math.sin(Math.PI * Math.pow(t, 0.78)), 0.85) * 0.27 * (1 - 0.15 * t);
+    const kenar = t > 0.1 && t < 0.97;
+    const fU = (t * DIS) % 1, fA = (t * DIS + 0.5) % 1;
+    const en1 = kenar ? govde * (0.88 + 0.12 * fU) : govde;
+    const en2 = kenar ? govde * (0.88 + 0.12 * fA) : govde;
+    const y = -0.07 * Math.sin(Math.PI * t);
+    ust.push([t, y - en1]); alt.push([t, y + en2 * 0.94]);
+  }
+  yesilYaprak.moveTo(0, 0);
+  ust.forEach(p => yesilYaprak.lineTo(p[0], p[1]));
+  for (let i = alt.length - 1; i >= 0; i--) yesilYaprak.lineTo(alt[i][0], alt[i][1]);
+  yesilYaprak.closePath();
+
+  // orta damar + yan damarlar
+  yaprakDamari.moveTo(0, 0);
+  yaprakDamari.quadraticCurveTo(0.5, -0.07, 0.96, 0);
+  [0.2, 0.34, 0.48, 0.62, 0.76].forEach(t => {
+    const y = -0.07 * Math.sin(Math.PI * t);
+    const g = Math.pow(Math.sin(Math.PI * Math.pow(t, 0.78)), 0.85) * 0.27 * 0.8;
+    yaprakDamari.moveTo(t, y); yaprakDamari.lineTo(t + 0.11, y - g);
+    yaprakDamari.moveTo(t, y); yaprakDamari.lineTo(t + 0.11, y + g);
+  });
+})();
+const yaprakBoyasi = ctx.createLinearGradient(0, -0.35, 0, 0.35);
+yaprakBoyasi.addColorStop(0, YESIL[3]);
+yaprakBoyasi.addColorStop(0.5, YESIL[2]);
+yaprakBoyasi.addColorStop(1, YESIL[1]);
+
+// her saptan 3 yaprak, sağ-sol dönüşümlü: [gül, sapta konum, açı, boyut]
+const SAP_YAPRAKLARI = [];
+BUKET.forEach((c, ci) => {
+  [0.3, 0.5, 0.68].forEach((konum, j) => {
+    const sag = (ci + j) % 2 === 0;
+    const aci = sag ? -(0.5 + rastgele() * 0.5) : -(Math.PI - 0.5 - rastgele() * 0.5);
+    SAP_YAPRAKLARI.push([ci, konum + (rastgele() - 0.5) * 0.06, aci, 9.5 + rastgele() * 3.5]);
+  });
+});
+const DIKENLER = [0.18, 0.36, 0.52];
+
+/* ---------- 8. Parçacıklar ---------- */
+const isiklar = [];
+for (let i = 0; i < AYARLAR.parilti; i++) isiklar.push({ x: 0, y: 0, hiz: 0, omur: 0, yas: 1, boy: 1, faz: 0, kayma: 0, tur: 0 });
+function isikDogur(p, dagit) {
+  const c = BUKET[Math.floor(rastgele() * BUKET.length)];
+  const a = rastgele() * Math.PI * 2, d = c.yaricap * (0.4 + rastgele() * 1.1);
+  p.x = c.bas[0] + Math.cos(a) * d; p.y = c.bas[1] + Math.sin(a) * d;
+  p.hiz = (1.0 + rastgele() * 2.2) * AYARLAR.parcacikHizi; p.omur = 3 + rastgele() * 4;
+  p.yas = dagit ? rastgele() * p.omur : 0;
+  const r = rastgele();
+  p.tur = r < 0.58 ? 0 : r < 0.82 ? 1 : 2;
+  p.boy = (p.tur === 0 ? 0.35 : 0.55) + rastgele() * 0.8;
+  p.faz = rastgele() * 10; p.kayma = (rastgele() - 0.5) * 1.5;
+}
+
+/* ---------- 9. Boyutlandırma ---------- */
+function boyutla() {
+  W = window.innerWidth; H = window.innerHeight;
+  tuval.width = Math.round(W * DPR); tuval.height = Math.round(H * DPR);
+  const yaziPayi = yazi ? 0.12 : 0;
+
+  olcek = Math.min(W * 0.9 / 98, H * (0.88 - yaziPayi) / 124);
+  merkezX = W / 2;
+  merkezY = H * (0.5 - yaziPayi / 2) + 1.5 * olcek;
+  yaziKutusu.style.top = (merkezY + 58 * olcek + Math.max(24, olcek * 3.5)) + 'px';
+  yaziKutusu.style.fontSize = Math.max(20, Math.min(olcek * 3.4, W * 0.045, 52)) + 'px';
+}
+window.addEventListener('resize', boyutla);
+
+const ekranX = x => (merkezX + x * olcek) * DPR;
+const ekranY = y => (merkezY + y * olcek) * DPR;
+
+/* ---------- 10. Saplar ---------- */
+const NOKTA = 48;
+const sapNoktalari = BUKET.map(() => Array.from({ length: NOKTA + 1 }, () => [0, 0]));
+
+function sapHesapla(c, ci, zaman, sallan) {
+  const kay = Math.sin(zaman * 0.9 + c.faz) * 1.5 * sallan * AYARLAR.salinim;
+  const kayY = Math.cos(zaman * 0.7 + c.faz) * 0.4 * sallan * AYARLAR.salinim;
+  const [x0, y0] = c.taban, [x1, y1] = c.kontrol[0], [x2, y2] = c.kontrol[1];
+  const x3 = c.bas[0] + kay, y3 = c.bas[1] + kayY;
+  const k1 = x1 + kay * 0.2, k2 = x2 + kay * 0.65;
+  const n = sapNoktalari[ci];
+  for (let i = 0; i <= NOKTA; i++) {
+    const t = i / NOKTA, u = 1 - t;
+    n[i][0] = u * u * u * x0 + 3 * u * u * t * k1 + 3 * u * t * t * k2 + t * t * t * x3;
+    n[i][1] = u * u * u * y0 + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t * t * t * y3;
+  }
+  c.x = x3; c.y = y3; c.donme = kay * 0.02;
+  // sapın baş tarafındaki yön (tomurcuk ekseni)
+  const ex = n[NOKTA][0] - n[NOKTA - 4][0], ey = n[NOKTA][1] - n[NOKTA - 4][1];
+  const el = Math.hypot(ex, ey) || 1;
+  c.eksenX = ex / el; c.eksenY = ey / el;
+}
+
+function sapCiz(ci, uzama) {
+  const n = sapNoktalari[ci], son = Math.floor(uzama * NOKTA);
+  if (son < 1) return;
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = YESIL[1];
+  for (let i = 1; i <= son; i++) {
+    ctx.lineWidth = (1.15 - 0.5 * i / NOKTA) * olcek * DPR;
+    ctx.beginPath();
+    ctx.moveTo(ekranX(n[i - 1][0]), ekranY(n[i - 1][1]));
+    ctx.lineTo(ekranX(n[i][0]), ekranY(n[i][1]));
+    ctx.stroke();
+  }
+  ctx.beginPath();
+  for (let i = 0; i <= son; i++) ctx.lineTo(ekranX(n[i][0] - 0.22), ekranY(n[i][1]));
+  ctx.strokeStyle = YESIL[3];
+  ctx.globalAlpha = 0.38;
+  ctx.lineWidth = 0.26 * olcek * DPR;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  // dikenler
+  ctx.fillStyle = YESIL[2];
+  for (let j = 0; j < DIKENLER.length; j++) {
+    const idx = Math.round(DIKENLER[j] * NOKTA);
+    if (idx + 1 > son) continue;
+    const a = n[idx - 1], b = n[idx + 1];
+    let tx = b[0] - a[0], ty = b[1] - a[1];
+    const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
+    const yon = (ci + j) % 2 === 0 ? 1 : -1;
+    const nx = -ty * yon, ny = tx * yon;
+    const px = n[idx][0], py = n[idx][1];
+    ctx.beginPath();
+    ctx.moveTo(ekranX(px - tx * 0.5), ekranY(py - ty * 0.5));
+    ctx.lineTo(ekranX(px + nx * 1.6 + tx * 0.3), ekranY(py + ny * 1.6 + ty * 0.3));
+    ctx.lineTo(ekranX(px + tx * 0.5), ekranY(py + ty * 0.5));
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+/* ---------- 11. Yapraklar ve çanak yaprakları ---------- */
+function yaprakYerlestir(x, y, aci, boy, en, ayna) {
+  const c = Math.cos(aci), s = Math.sin(aci);
+  ctx.setTransform(c * boy, s * boy, -s * en * ayna, c * en * ayna, x, y);
+}
+
+function yaprakCiz(tanim, zaman) {
+  const [ci, konum, aci, boyut] = tanim;
+  const c = BUKET[ci];
+  const bas = c.sapBas + AYARLAR.sapSuresi * (0.25 + 0.6 * konum) + 0.1;
+  const p = yumusak(ilerleme(zaman, bas, 1.2));
+  if (p <= 0) return;
+  const n = sapNoktalari[ci][Math.round(konum * NOKTA)];
+  const sol = aci < -1.57;
+  const a = aci + (1 - p) * (sol ? 1.1 : -1.1);
+  const s = boyut * olcek * DPR * p;
+  yaprakYerlestir(ekranX(n[0]), ekranY(n[1]), a, s, s, sol ? -1 : 1);
+  ctx.fillStyle = yaprakBoyasi;
+  ctx.fill(yesilYaprak);
+  ctx.strokeStyle = 'rgba(150,210,140,0.2)';
+  ctx.lineWidth = 0.012;
+  ctx.stroke(yesilYaprak);
+  ctx.strokeStyle = 'rgba(190,235,170,0.34)';
+  ctx.lineWidth = 0.014;
+  ctx.stroke(yaprakDamari);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+}
+
+const SEPAL_ACILARI = [-0.62, -0.26, 0.26, 0.62];
+function canakCiz(c, bx, by, Rb, acik, alfa) {
+  if (alfa <= 0.01) return;
+  const eksenAci = Math.atan2(c.eksenY, c.eksenX);
+  ctx.globalAlpha = alfa;
+  ctx.fillStyle = yaprakBoyasi;
+  for (let i = 0; i < SEPAL_ACILARI.length; i++) {
+    const a = eksenAci + SEPAL_ACILARI[i] * (1 + acik * 2.6);
+    const boy = Rb * (1.0 + 0.5 * acik);
+    yaprakYerlestir(bx, by, a, boy, boy * 0.45, SEPAL_ACILARI[i] < 0 ? -1 : 1);
+    ctx.fill(yesilYaprak);
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
+}
+
+/* ---------- 12. Gül çizimi ---------- */
+function sarmalCiz(R, acik) {
+  ctx.lineCap = 'round';
+  for (let i = SARMAL_SAYISI - 1; i >= 0; i--) {
+    const r = R * (0.04 + i * 0.046) * (0.5 + 0.5 * acik);
+    const bas = i * 2.3;
+    ctx.lineWidth = R * 0.064 * (0.6 + 0.4 * acik);
+    ctx.strokeStyle = SARMAL_RENK[i];
+    ctx.beginPath(); ctx.arc(0, 0, r, bas, bas + 4.2); ctx.stroke();
+    ctx.lineWidth = R * 0.012;
+    ctx.strokeStyle = SARMAL_ISIK;
+    ctx.beginPath(); ctx.arc(0, 0, r + R * 0.018, bas + 0.5, bas + 2.8); ctx.stroke();
+  }
+  ctx.fillStyle = GUL[0];
+  ctx.beginPath(); ctx.arc(0, 0, R * 0.03, 0, Math.PI * 2); ctx.fill();
+}
+
+function cicekCiz(c, zaman) {
+  const tomur = yumusak(ilerleme(zaman, c.tomurBas, AYARLAR.tomurSuresi));
+  if (tomur <= 0) return;
+  const genel = ilerleme(zaman, c.cicekBas, AYARLAR.acilmaSuresi);
+  const R = c.yaricap * olcek * DPR;
+  const cx = ekranX(c.x), cy = ekranY(c.y);
+
+  // yumuşak hale
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = 0.07 * tomur + 0.2 * yumusak(genel);
+  const h = R * 2.1;
+  ctx.drawImage(haleIsigi, cx - h, cy - h, h * 2, h * 2);
+  ctx.globalCompositeOperation = 'source-over';
+
+  // tomurcuk ve çanak yaprakları
+  const Rb = R * 0.52 * (0.35 + 0.65 * tomur) * (1 - 0.4 * yumusak(ilerleme(genel, 0, 0.3)));
+  const tomurAlfa = Math.min(1, tomur * 2) * (1 - yumusak(ilerleme(genel, 0.02, 0.2)));
+  const acikCanak = yumusak(ilerleme(genel, 0, 0.5));
+  const bx = cx - c.eksenX * 1.15 * Rb, by = cy - c.eksenY * 1.15 * Rb;
+  if (tomurAlfa > 0.01) {
+    const ta = Math.atan2(c.eksenY, c.eksenX);
+    const s = (2.4 * Rb) / TOM_BOY;
+    ctx.globalAlpha = tomurAlfa;
+    ctx.setTransform(Math.cos(ta) * s, Math.sin(ta) * s, -Math.sin(ta) * s, Math.cos(ta) * s, bx, by);
+    ctx.drawImage(tomurcukResmi, -TOM_BAS, -TOM_ORTA);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+  }
+  canakCiz(c, bx, by, Rb, acikCanak, Math.min(1, tomur * 2) * (1 - yumusak(ilerleme(genel, 0.35, 0.5))));
+
+  if (genel <= 0) return;
+
+  // eğik bakış matrisi
+  const eg = c.egim + c.donme, ce = Math.cos(eg), se = Math.sin(eg), b = GUL_BASIKLIK;
+  const m11 = ce * ce + b * se * se, m12 = ce * se * (1 - b), m22 = se * se + b * ce * ce;
+
+  // taç yaprakları: dıştan içe
+  const y = c.yapraklar;
+  for (let i = 0; i < y.length; i++) {
+    const p = y[i];
+    const k = ilerleme(genel, p.acilis, p.sure);
+    if (k <= 0) continue;
+    const e = yayli(k);
+    const a = p.aci + p.girdap + (1 - e) * 0.7 + c.donme;
+    const dx = Math.cos(a), dy = Math.sin(a);
+    const yx = m11 * dx + m12 * dy, yy = m12 * dx + m22 * dy;
+    const len = Math.hypot(yx, yy) || 1;
+    const ux = yx / len, uy = yy / len;
+    const boy = p.boy * R * (0.28 + 0.72 * e) * (0.78 + 0.22 * len);
+    const en = p.en * R * (0.55 + 0.45 * e);
+    const tab = p.taban * R * e;
+    ctx.globalAlpha = Math.min(1, k * 4);
+    ctx.setTransform(ux * boy / YAP_BOY, uy * boy / YAP_BOY, -uy * en / YAP_YARI, ux * en / YAP_YARI,
+      cx + yx * tab, cy + yy * tab);
+    ctx.drawImage(gulYapraklari[p.sekil][p.ton], -YAP_BAS, -YAP_ORTA);
+  }
+
+  // merkezdeki sıkı sarmal
+  ctx.globalAlpha = Math.min(1, genel * 6);
+  ctx.setTransform(m11, m12, m12, m22, cx, cy);
+  sarmalCiz(R, acikCanak);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  // yumuşak üst ışık
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = 0.12 * yumusak(genel);
+  const v = R * 0.85;
+  ctx.drawImage(vurguIsigi, cx - R * 0.3 - v, cy - R * 0.35 - v, v * 2, v * 2);
+  ctx.globalAlpha = 0.18 * yumusak(genel);
+  const m = R * 0.45;
+  ctx.drawImage(haleIsigi, cx - m, cy - m, m * 2, m * 2);
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 1;
+}
+
+/* ---------- 13. Parçacıkları çiz ---------- */
+function isiklariCiz(zaman, dt) {
+  const gor = ilerleme(zaman, ILK_ACILMA + 0.8, 1.5);
+  if (gor <= 0) return;
+  ctx.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < isiklar.length; i++) {
+    const p = isiklar[i];
+    p.yas += dt;
+    if (p.yas >= p.omur) isikDogur(p, false);
+    p.y -= p.hiz * dt; p.x += Math.sin(zaman + p.faz) * p.kayma * dt;
+    const o = p.yas / p.omur;
+    ctx.globalAlpha = gor * Math.sin(o * Math.PI) * (0.5 + 0.5 * Math.sin(zaman * 3 + p.faz));
+    const s = p.boy * olcek * DPR * 1.6;
+    ctx.drawImage(ISIK_TURLERI[p.tur], ekranX(p.x) - s, ekranY(p.y) - s, s * 2, s * 2);
+  }
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 1;
+}
+
+/* ---------- 14. Ana çizim: zaman çizelgesi ---------- */
+function ciz(zaman, dt) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, tuval.width, tuval.height);
+
+  // 1. evre: karanlık içinde hafif ortam ışığı
+  const ortam = yumusak(ilerleme(zaman, 0, 3));
+  if (ortam > 0) {
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.4 * ortam;
+    const r = 66 * olcek * DPR;
+    ctx.drawImage(ortamIsigi, ekranX(0) - r, ekranY(-14) - r, r * 2, r * 2);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+  }
+
+  const sallan = yumusak(ilerleme(zaman, SON_ACILMA - 1.5, 2.5));
+  for (let i = 0; i < BUKET.length; i++) sapHesapla(BUKET[i], i, zaman, sallan);
+
+  // 2. evre: saplar, 3. evre: yapraklar, 4-5. evre: tomurcuk ve çiçek açma
+  for (let i = 0; i < BUKET.length; i++) {
+    const c = BUKET[i];
+    sapCiz(i, akici(ilerleme(zaman, c.sapBas, AYARLAR.sapSuresi)));
+  }
+  for (let i = 0; i < SAP_YAPRAKLARI.length; i++) yaprakCiz(SAP_YAPRAKLARI[i], zaman);
+  for (let i = 0; i < BUKET.length; i++) cicekCiz(BUKET[i], zaman);
+  isiklariCiz(zaman, dt);
+
+  // 7. evre: yazı
+  if (yazi && zaman > SON_ACILMA - 0.8) yaziKutusu.classList.add('gorunur');
+}
+
+/* ---------- 15. Döngü, giriş, kayıt modu ---------- */
+let baslangic = 0, sonZaman = 0, sanalZaman = 0;
+function yenidenBaslat() {
+  baslangic = performance.now(); sanalZaman = 0;
+  isiklar.forEach(p => isikDogur(p, true));
+  yaziKutusu.classList.remove('gorunur');
+}
+function dongu(simdi) {
+  const dt = Math.min((simdi - sonZaman) / 1000, 0.05);
+  sonZaman = simdi;
+  ciz((simdi - baslangic) / 1000, dt);
+  requestAnimationFrame(dongu);
+}
+
+window.addEventListener('click', yenidenBaslat);
+window.addEventListener('dblclick', tamEkran);
+window.addEventListener('keydown', e => {
+  if (e.repeat) return;
+  if (e.code === 'Space') { e.preventDefault(); yenidenBaslat(); }
+  if (e.key === 'f' || e.key === 'F') tamEkran();
+});
+function tamEkran() {
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
+  else document.exitFullscreen();
+}
+
+let imlecSayac;
+window.addEventListener('mousemove', () => {
+  document.body.classList.remove('imlec-gizli');
+  clearTimeout(imlecSayac);
+  imlecSayac = setTimeout(() => document.body.classList.add('imlec-gizli'), 1500);
+});
+
+boyutla();
+yenidenBaslat();
+if (kayitModu) {
+  window.kareIlerle = s => { sanalZaman += s; ciz(sanalZaman, s); };
+} else {
+  sonZaman = performance.now();
+  requestAnimationFrame(dongu);
+}
+</script>
+</body>
+</html>
