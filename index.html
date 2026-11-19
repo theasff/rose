@@ -19,11 +19,55 @@
     text-wrap: balance;
   }
   #yazi.gorunur { opacity: 1; }
+
+  /* sağ alt köşe imzası */
+  #imza {
+    position: fixed;
+    right: max(14px, env(safe-area-inset-right));
+    bottom: max(14px, env(safe-area-inset-bottom));
+    max-width: calc(100vw - 28px);
+    box-sizing: border-box;
+    padding: 0.7em 1.3em 0.75em;
+    text-align: center;
+    background: none;
+    font-family: "Segoe UI", "Trebuchet MS", "Helvetica Neue", Arial, sans-serif;
+    font-style: italic; font-weight: 600;
+    font-size: clamp(13px, 1.7vw, 19px);
+    line-height: 1.5; letter-spacing: 0.02em;
+    color: #e0405f;
+    text-shadow: 0 0 8px rgba(224, 64, 95, 0.3), 0 0 18px rgba(139, 16, 40, 0.35);
+    pointer-events: none; user-select: none;
+    overflow-wrap: anywhere;
+  }
+  #imza span { display: block; }
+  #imza .kucuk {
+    font-size: 0.72em; font-weight: 400; letter-spacing: 0.05em;
+    color: #b9506a; margin-top: 0.15em;
+  }
+  #imza .kalp {
+    display: inline-block;
+    color: #e85d70;
+    text-shadow: 0 0 8px rgba(232, 93, 112, 0.55), 0 0 16px rgba(197, 31, 58, 0.4);
+    animation: kalp-atisi 2.2s ease-in-out infinite;
+    transform-origin: center;
+  }
+  @keyframes kalp-atisi {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.25); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #imza .kalp { animation: none; }
+  }
 </style>
 </head>
 <body>
 <canvas id="sahne"></canvas>
 <div id="yazi"></div>
+<div id="imza" aria-label="Made with love, for Sena, by Asaf">
+  <span>Made with love,</span>
+  <span>for Sena <b class="kalp" style="font-weight:400">♥</b></span>
+  <span class="kucuk">by Asaf</span>
+</div>
 
 <script>
 /* =====================================================================
