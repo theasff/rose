@@ -162,9 +162,350 @@
     .karsilama-icerik, .kalp-atis, .dalga i { animation: none; }
     #karsilama, #karsilama.kapandi .karsilama-icerik { transition-duration: 0.01s; }
   }
+
+  /* =====================================================================
+     BÖLÜMLER: giriş mesajı, anılar, mektup, gezinme
+     ===================================================================== */
+
+  /* müzik paneli: tüm bölümlerde sabit, lightbox'ın da üstünde */
+  #muzikPaneli {
+    z-index: 12; pointer-events: none;
+    padding: 4px 14px 4px 5px;
+    left: max(9px, calc(env(safe-area-inset-left) - 5px));
+    bottom: max(10px, env(safe-area-inset-bottom));
+    transition: opacity 1.6s ease 1.2s, background 0.6s ease, box-shadow 0.6s ease;
+  }
+  body.basladi #muzikPaneli { pointer-events: auto; }
+  body[data-bolum="anilar"] #muzikPaneli, body[data-bolum="mektup"] #muzikPaneli {
+    background: rgba(10, 3, 5, 0.74); border-radius: 999px;
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+    box-shadow: 0 0 0 1px rgba(224, 64, 95, 0.14);
+  }
+  body[data-bolum="anilar"].imlec-gizli, body[data-bolum="mektup"].imlec-gizli { cursor: auto; }
+
+  /* gül sahnesi ve imza: diğer bölümlere geçerken solar */
+  #sahne { transition: opacity 0.9s ease, transform 1.8s cubic-bezier(0.22, 0.61, 0.36, 1); }
+  body[data-bolum="gul"] #sahne { transition: opacity 1.1s ease 0.5s, transform 1.8s cubic-bezier(0.22, 0.61, 0.36, 1); }
+  body[data-bolum="anilar"] #sahne, body[data-bolum="mektup"] #sahne { opacity: 0; }
+  #yazi { transition: opacity 1.8s ease, transform 1.8s cubic-bezier(0.22, 0.61, 0.36, 1); }
+  #imza { transition: opacity 0.8s ease; }
+  body[data-bolum="anilar"] #yazi, body[data-bolum="mektup"] #yazi,
+  body[data-bolum="anilar"] #imza, body[data-bolum="mektup"] #imza { opacity: 0; transition: opacity 0.6s ease; }
+
+  /* ortak zarif düğme */
+  .zarif-dugme {
+    padding: 0.8em 1.7em; cursor: pointer;
+    font: 300 clamp(13px, 1.5vw, 15px) "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    letter-spacing: 0.12em; color: #e0405f; background: transparent;
+    border: 1px solid rgba(224, 64, 95, 0.5); border-radius: 999px;
+    text-shadow: 0 0 10px rgba(224, 64, 95, 0.3);
+    transition: background 0.5s ease, box-shadow 0.5s ease, border-color 0.5s ease, color 0.5s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .zarif-dugme:hover, .zarif-dugme:focus-visible {
+    outline: none; color: #ff8fa0; border-color: rgba(255, 120, 140, 0.8);
+    background: rgba(139, 16, 40, 0.22);
+    box-shadow: 0 0 22px rgba(197, 31, 58, 0.35), inset 0 0 14px rgba(197, 31, 58, 0.15);
+  }
+
+  /* ---------- 1. bölüm: güller bittikten sonra mesaj ---------- */
+  #giris {
+    position: fixed; z-index: 4; left: 50%; transform: translateX(-50%);
+    bottom: 92px; width: min(90vw, 300px); text-align: center;
+    visibility: hidden; transition: visibility 0s linear 0.7s;
+  }
+  #giris.gorunur { visibility: visible; transition-delay: 0s; }
+  @media (min-width: 560px) { #giris { bottom: 36px; } }
+  @media (min-width: 900px) { #giris { width: 520px; } }
+  #giris .mesaj {
+    margin: 0 0 1.4em;
+    font: 300 clamp(16px, 2.2vw, 22px)/1.5 "Segoe UI Light", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    letter-spacing: 0.12em; color: rgba(255, 240, 243, 0.92);
+    text-shadow: 0 0 18px rgba(224, 64, 95, 0.28);
+    opacity: 0; transform: translateY(8px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+  #giris .zarif-dugme {
+    opacity: 0; transform: translateY(8px);
+    transition: opacity 0.6s ease, transform 0.6s ease, background 0.5s ease, box-shadow 0.5s ease, border-color 0.5s ease, color 0.5s ease;
+  }
+  #giris.gorunur .mesaj { opacity: 1; transform: none; transition: opacity 1.8s ease 0.2s, transform 1.8s ease 0.2s; }
+  #giris.gorunur .zarif-dugme {
+    opacity: 1; transform: none;
+    transition: opacity 1.6s ease 1.4s, transform 1.6s ease 1.4s, background 0.5s ease, box-shadow 0.5s ease, border-color 0.5s ease, color 0.5s ease;
+  }
+
+  /* ---------- gezinme ---------- */
+  #gezinme {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 6;
+    display: flex; justify-content: center; gap: clamp(0px, 2vw, 14px);
+    padding: 10px 8px 22px; pointer-events: none;
+    background: linear-gradient(to bottom, rgba(5, 1, 3, 0.88), rgba(5, 1, 3, 0));
+    opacity: 0; visibility: hidden; transition: opacity 1s ease, visibility 0s linear 1s;
+  }
+  body.gezinme-acik #gezinme { opacity: 1; visibility: visible; transition: opacity 1.4s ease 0.4s; }
+  #gezinme button {
+    pointer-events: auto; position: relative; padding: 9px 12px; cursor: pointer;
+    font: 300 11px/1 "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    letter-spacing: 0.26em; text-transform: uppercase;
+    color: rgba(255, 225, 230, 0.45); background: none; border: 0;
+    transition: color 0.4s ease, text-shadow 0.4s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #gezinme button::after {
+    content: ''; position: absolute; left: 12px; right: 12px; bottom: 3px; height: 1px;
+    background: currentColor; transform: scaleX(0); transition: transform 0.5s ease;
+  }
+  #gezinme button:hover, #gezinme button:focus-visible { outline: none; color: rgba(255, 225, 230, 0.85); }
+  #gezinme button[aria-current="page"] { color: #ee6c82; text-shadow: 0 0 12px rgba(224, 64, 95, 0.5); }
+  #gezinme button[aria-current="page"]::after { transform: scaleX(1); }
+
+  /* ---------- bölüm kapları ---------- */
+  .bolum {
+    position: fixed; inset: 0; z-index: 3; overflow-x: hidden; overflow-y: auto;
+    overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin; scrollbar-color: rgba(224, 64, 95, 0.3) transparent;
+    opacity: 0; visibility: hidden;
+    transition: opacity 0.9s ease, visibility 0s linear 0.9s;
+  }
+  .bolum.aktif { opacity: 1; visibility: visible; transition: opacity 1.1s ease 0.5s, visibility 0s; }
+  .bolum:focus { outline: none; }
+  #bolum-anilar { background: radial-gradient(ellipse 90% 60% at 50% 0%, #240911 0%, #0b0306 60%, #050102 100%); }
+  #bolum-mektup { background: radial-gradient(ellipse 80% 60% at 50% 35%, #2c0913 0%, #0d0307 62%, #040102 100%); }
+  .bolum-ic { max-width: 1080px; margin: 0 auto; padding: 92px clamp(16px, 4vw, 40px) 130px; }
+  .ust-yazi {
+    margin: 0 0 14px; text-align: center; text-transform: uppercase;
+    font: 300 12px "Segoe UI", "Helvetica Neue", Arial, sans-serif; letter-spacing: 0.34em; color: #c4284a;
+  }
+  .bolum-baslik h2 {
+    margin: 0 auto; max-width: 18em; text-align: center; font-weight: 300;
+    font-family: "Segoe UI Light", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: clamp(24px, 4.2vw, 40px); line-height: 1.35; letter-spacing: 0.04em;
+    color: rgba(255, 240, 243, 0.94); text-shadow: 0 0 24px rgba(224, 64, 95, 0.25);
+  }
+  .bolum-baslik::after { content: '♡'; display: block; margin-top: 18px; text-align: center; color: #e85d70; opacity: 0.8; }
+
+  /* ---------- 2. bölüm: polaroid galeri ---------- */
+  .galeri {
+    display: grid; gap: 44px 34px; margin-top: 60px; padding: 0 4px;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr));
+  }
+  @media (max-width: 640px) { .galeri { grid-template-columns: repeat(2, 1fr); gap: 28px 16px; margin-top: 44px; padding: 0; } }
+  .galeri-ipucu {
+    margin: 22px auto 0; max-width: 30em; text-align: center; font-style: italic; font-size: 13px;
+    line-height: 1.6; letter-spacing: 0.04em; color: #b9506a;
+    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  }
+  .polaroid {
+    --r: 0deg; --y: 0px; --d: 0s;
+    position: relative; margin: 0; padding: 10px 10px 0; cursor: pointer; border-radius: 3px;
+    background: linear-gradient(160deg, #faf4e9, #f0e6d4);
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.45), 0 10px 22px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    opacity: 0; transform: translateY(var(--y)) rotate(var(--r));
+    transition: transform 0.45s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.45s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .polaroid.gor { opacity: 1; animation: polaroid-gir 0.95s cubic-bezier(0.2, 0.7, 0.2, 1) var(--d) backwards; }
+  @keyframes polaroid-gir {
+    from { opacity: 0; transform: translateY(48px) rotate(calc(var(--r) * 2.2)) scale(0.94); }
+    to { opacity: 1; transform: translateY(var(--y)) rotate(var(--r)); }
+  }
+  .polaroid.gor:hover, .polaroid.gor:focus-visible {
+    outline: none; z-index: 2; transform: translateY(calc(var(--y) - 10px)) rotate(0deg) scale(1.05);
+    box-shadow: 0 2px 2px rgba(0, 0, 0, 0.4), 0 22px 40px rgba(0, 0, 0, 0.65), 0 0 34px rgba(197, 31, 58, 0.2);
+  }
+  .polaroid:focus-visible { box-shadow: 0 0 0 2px #e85d70, 0 22px 40px rgba(0, 0, 0, 0.65); }
+  .polaroid .foto {
+    position: relative; aspect-ratio: 1 / 1.04; overflow: hidden; background: #1a0a0d;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25), inset 0 2px 8px rgba(0, 0, 0, 0.45);
+  }
+  .polaroid .foto img {
+    display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0;
+    filter: saturate(0.96) contrast(1.03); transition: opacity 0.9s ease;
+  }
+  .polaroid .foto img.hazir { opacity: 1; }
+  .polaroid .foto::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 40%, rgba(0, 0, 0, 0.18));
+  }
+  .polaroid figcaption, .ik-polaroid figcaption {
+    min-height: 3.5em; padding: 9px 4px 12px; display: flex; flex-direction: column; justify-content: center;
+    align-items: center; gap: 2px; text-align: center; color: #3b2126;
+    font: 400 clamp(13px, 1.5vw, 16px)/1.25 "Bradley Hand", "Segoe Print", "Segoe Script", "Snell Roundhand", "Lucida Handwriting", cursive;
+  }
+  figcaption .tarih { font-size: 0.78em; opacity: 0.62; letter-spacing: 0.06em; }
+  .polaroid.bos { cursor: default; }
+  .polaroid.bos .foto {
+    display: grid; place-items: center; align-content: center; gap: 6px;
+    background: linear-gradient(145deg, #2c0a14, #12040a); color: rgba(232, 93, 112, 0.7);
+    font: 300 12px "Segoe UI", Arial, sans-serif; letter-spacing: 0.12em;
+  }
+  .polaroid.bos .foto b { font-size: 26px; font-weight: 400; }
+  .bolum-alt { margin-top: 84px; text-align: center; }
+
+  /* ---------- lightbox ---------- */
+  .isik-kutusu {
+    position: fixed; inset: 0; z-index: 9; display: flex; align-items: center; justify-content: center;
+    background: rgba(4, 1, 3, 0.93); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    opacity: 0; visibility: hidden; transition: opacity 0.45s ease, visibility 0s linear 0.45s;
+    touch-action: pan-y;
+  }
+  .isik-kutusu.acik { opacity: 1; visibility: visible; transition: opacity 0.45s ease; }
+  .ik-polaroid {
+    margin: 0; padding: 14px 14px 0; border-radius: 3px; max-width: 94vw;
+    background: linear-gradient(160deg, #faf4e9, #f0e6d4);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7), 0 0 60px rgba(139, 16, 40, 0.2);
+    transform: scale(0.95) rotate(-1.2deg); transition: transform 0.55s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .isik-kutusu.acik .ik-polaroid { transform: none; }
+  #ikResim {
+    display: block; max-width: min(88vw, 820px); max-height: 64vh; object-fit: contain;
+    background: #1a0a0d; transition: opacity 0.25s ease;
+  }
+  .ik-polaroid figcaption { font-size: clamp(15px, 2vw, 19px); min-height: 3.4em; }
+  .ik-dugme {
+    position: absolute; z-index: 2; width: 44px; height: 44px; padding: 0; display: grid; place-items: center;
+    cursor: pointer; color: #e0405f; background: rgba(10, 3, 5, 0.55); font-size: 24px; line-height: 1;
+    border: 1px solid rgba(224, 64, 95, 0.4); border-radius: 50%;
+    transition: border-color 0.4s ease, box-shadow 0.4s ease, color 0.4s ease; -webkit-tap-highlight-color: transparent;
+  }
+  .ik-dugme:hover, .ik-dugme:focus-visible { outline: none; color: #ff8fa0; border-color: rgba(255, 120, 140, 0.85); box-shadow: 0 0 18px rgba(197, 31, 58, 0.4); }
+  .ik-kapat { top: max(14px, env(safe-area-inset-top)); right: 14px; }
+  .ik-onceki { left: 12px; top: 50%; margin-top: -22px; }
+  .ik-sonraki { right: 12px; top: 50%; margin-top: -22px; }
+  .ik-sayac {
+    position: absolute; bottom: max(22px, env(safe-area-inset-bottom)); left: 0; right: 0; text-align: center;
+    font: 300 12px "Segoe UI", Arial, sans-serif; letter-spacing: 0.3em; color: #b9506a;
+  }
+  @media (max-width: 640px) {
+    /* müzik paneli sol altta durduğu için oklar sağ alta, sayaç sol üste (hiçbiri panelin altında kalmaz) */
+    .ik-onceki, .ik-sonraki { top: auto; bottom: max(14px, env(safe-area-inset-bottom)); margin: 0; width: 40px; height: 40px; }
+    .ik-sonraki { right: 14px; left: auto; }
+    .ik-onceki { right: 62px; left: auto; }
+    .ik-sayac { top: calc(max(14px, env(safe-area-inset-top)) + 15px); bottom: auto; left: 16px; right: auto; text-align: left; }
+  }
+
+  /* ---------- 3. bölüm: mektup ---------- */
+  .mektup-sahne {
+    position: relative; box-sizing: border-box; min-height: 100%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 96px 16px 120px;
+  }
+  .mektup-isik { position: fixed; inset: 0; overflow: hidden; pointer-events: none; }
+  .mektup-isik i {
+    position: absolute; bottom: -24px; left: var(--x); width: var(--s); height: var(--s); border-radius: 50%; opacity: 0;
+    background: radial-gradient(circle, rgba(255, 170, 185, 0.9), rgba(224, 64, 95, 0) 70%);
+    animation: yuksel var(--t) linear var(--d) infinite;
+  }
+  .bolum:not(.aktif) .mektup-isik i { animation-play-state: paused; }
+  @keyframes yuksel {
+    0% { transform: translate(0, 0); opacity: 0; }
+    15% { opacity: 0.7; } 85% { opacity: 0.45; }
+    100% { transform: translate(var(--k), -112vh); opacity: 0; }
+  }
+  .zarf-kutu { position: relative; z-index: 1; margin-top: 12vh; text-align: center; transition: opacity 0.7s ease, transform 0.7s ease; }
+  .zarf-kutu.gitti { opacity: 0; transform: translateY(30px) scale(0.94); pointer-events: none; }
+  .zarf {
+    position: relative; display: block; width: min(84vw, 400px); aspect-ratio: 3 / 2; padding: 0; margin: 0 auto;
+    background: none; border: 0; cursor: pointer; perspective: 1000px; -webkit-tap-highlight-color: transparent;
+  }
+  .zarf:focus-visible { outline: 1px solid rgba(255, 120, 140, 0.7); outline-offset: 10px; }
+  .zarf > * { position: absolute; display: block; }
+  .zarf-arka {
+    inset: 0; border-radius: 0; z-index: 0;
+    background: linear-gradient(160deg, #7d1228, #4a0918);
+    box-shadow: 0 26px 54px rgba(0, 0, 0, 0.65), 0 0 70px rgba(139, 16, 40, 0.3);
+  }
+  .zarf-kagit {
+    left: 6%; right: 6%; top: 6%; bottom: 4%; z-index: 2; border-radius: 2px;
+    background: linear-gradient(#fbf4e6, #f0e2ca);
+    transition: transform 1.05s cubic-bezier(0.3, 0.7, 0.2, 1) 0.7s;
+  }
+  /* ön cep: gerçek bir SVG şekli (clip-path değil), böylece kâğıt çıkarken V kesiği her karede doğru görünür */
+  .zarf-on { inset: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; }
+  .zarf-cizgi { inset: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; }
+  .zarf-kapak {
+    left: 0; top: 0; width: 100%; height: 56%; z-index: 4; transform-origin: top center;
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+    background: linear-gradient(#a21c38, #701026);
+    transition: transform 0.85s cubic-bezier(0.5, 0, 0.2, 1), z-index 0s linear 0.42s;
+  }
+  .muhur {
+    left: 42.5%; top: 44.75%; width: 15%; aspect-ratio: 1; z-index: 5; display: grid; place-items: center;
+    border-radius: 50%; color: #ffd2da; font-size: clamp(14px, 3.6vw, 22px);
+    background: radial-gradient(circle at 35% 30%, #d8304f, #8b1028 60%, #5a0a1b);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5), inset 0 -3px 6px rgba(0, 0, 0, 0.3), inset 0 2px 4px rgba(255, 170, 185, 0.35);
+    animation: kalp-atisi 2.4s ease-in-out infinite; transition: opacity 0.4s ease;
+  }
+  .zarf-kutu.acildi .zarf-kapak { transform: rotateX(180deg); z-index: 1; }
+  .zarf-kutu.acildi .zarf-kagit { transform: translateY(-58%); }
+  .zarf-kutu.acildi .muhur { opacity: 0; animation: none; }
+  .zarf-ipucu {
+    margin: 30px 0 0; font: italic 300 13px "Segoe UI", Arial, sans-serif; letter-spacing: 0.16em;
+    color: #b9506a; transition: opacity 0.5s ease;
+  }
+  .zarf-kutu.acildi .zarf-ipucu { opacity: 0; }
+
+  .mektup {
+    display: none; position: relative; z-index: 1; box-sizing: border-box; width: min(92vw, 580px);
+    padding: clamp(34px, 6vw, 56px) clamp(24px, 6vw, 52px) clamp(32px, 5vw, 46px);
+    color: #3b2126; border-radius: 3px;
+    background: radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 55%),
+                linear-gradient(175deg, #f9f1e3, #f0e2ca 70%, #ead9be);
+    box-shadow: 0 30px 90px rgba(0, 0, 0, 0.7), 0 0 80px rgba(139, 16, 40, 0.22), inset 0 0 70px rgba(139, 16, 40, 0.07);
+    opacity: 0; transform: translateY(22px) scale(0.97);
+    transition: opacity 1.1s ease, transform 1.3s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .mektup.acik { opacity: 1; transform: none; }
+  .mektup::before { content: ''; position: absolute; inset: 10px; pointer-events: none; border: 1px solid rgba(139, 16, 40, 0.18); border-radius: 2px; }
+  .mektup .selam, .mektup .imza-mektup {
+    margin: 0; color: #8b1028;
+    font-family: "Snell Roundhand", "Segoe Script", "Brush Script MT", "Lucida Handwriting", "Apple Chancery", cursive;
+  }
+  .mektup .selam { font-size: clamp(28px, 5vw, 38px); line-height: 1.2; margin-bottom: 0.7em; }
+  .mektup #mektupMetni p {
+    margin: 0 0 1.15em; font: italic 400 clamp(16px, 2.3vw, 19px)/1.9 Georgia, "Palatino Linotype", "Times New Roman", serif;
+  }
+  .mektup .imza-mektup { margin-top: 1.5em; text-align: right; font-size: clamp(24px, 4.4vw, 32px); line-height: 1.2; }
+  .mektup .rev { opacity: 0; }
+  .mektup.acik .rev { animation: yaz-gel 1.5s ease forwards; animation-delay: calc(var(--i) * 0.9s + 0.6s); }
+  @keyframes yaz-gel {
+    from { opacity: 0; transform: translateY(10px); filter: blur(4px); }
+    to { opacity: 1; transform: none; filter: blur(0); }
+  }
+  .mektup-gezinme {
+    position: relative; z-index: 1; margin-top: 44px; display: flex; flex-wrap: wrap; justify-content: center; gap: 12px;
+    opacity: 0; visibility: hidden; transition: opacity 1.2s ease, visibility 0s linear 1.2s;
+  }
+  .mektup-gezinme.goster { opacity: 1; visibility: visible; transition: opacity 1.2s ease; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bolum, .bolum.aktif, #giris, #giris *, #gezinme, .isik-kutusu, .polaroid, .zarf-kutu, .mektup, .mektup-gezinme, #sahne, #yazi, #imza {
+      transition-duration: 0.01s !important; transition-delay: 0s !important;
+    }
+    .polaroid { opacity: 1; }
+    .polaroid.gor { animation: none; }
+    .mektup .rev, .mektup.acik .rev { animation: none; opacity: 1; transform: none; filter: none; }
+    .mektup-isik { display: none; }
+    .muhur { animation: none; }
+  }
+
+  /* güller bittikten sonra sahne yukarı çıkıp küçülür, altta mesaj ve düğme için yer açılır
+     (--gul-s, --gul-dy, --yazi-dy değerlerini JS ekran boyutuna göre hesaplar) */
+  body.gul-bitti #sahne { transform: translateY(var(--gul-dy, 0px)) scale(var(--gul-s, 1)); }
+  body.gul-bitti #yazi { transform: translateY(var(--yazi-dy, 0px)); }
+  body.ik-acik .bolum { overflow: hidden; }
+  @media (min-width: 641px) and (max-width: 900px) {
+    #ikResim { max-width: calc(100vw - 150px); }   /* oklar fotoğrafın kenarına binmesin */
+  }
+  @media (max-width: 640px) {
+    .isik-kutusu { align-items: flex-start; padding-top: 62px; box-sizing: border-box; }
+    #ikResim { max-height: 50vh; }
+  }
+  [hidden] { display: none !important; }
 </style>
 </head>
-<body>
+<body data-bolum="gul">
 <canvas id="sahne"></canvas>
 <div id="yazi"></div>
 <div id="imza" aria-label="Made with love, for Sena, by Asaf">
@@ -192,6 +533,81 @@
   <span class="muzik-not">music unavailable</span>
 </div>
 <audio id="muzik" src="assets/music/lovesong.mp3" preload="auto" loop></audio>
+
+<!-- ============ 1. bölüm: güller bittikten sonra çıkan mesaj ============ -->
+<div id="giris">
+  <p class="mesaj">A little place made just for you.</p>
+  <button id="kesfet" class="zarif-dugme" type="button" data-git="anilar">Explore Our Story ♡</button>
+</div>
+
+<!-- ============ gezinme ============ -->
+<nav id="gezinme" aria-label="Sections">
+  <button type="button" data-git="gul" aria-current="page">Roses</button>
+  <button type="button" data-git="anilar">Memories</button>
+  <button type="button" data-git="mektup">Letter</button>
+</nav>
+
+<!-- ============ 2. bölüm: anılar ============ -->
+<section id="bolum-anilar" class="bolum" tabindex="-1" aria-label="Our Memories" aria-hidden="true" inert>
+  <div class="bolum-ic">
+    <header class="bolum-baslik">
+      <p class="ust-yazi">Our Memories</p>
+      <h2>Our memories, our little moments, our story.</h2>
+    </header>
+    <div class="galeri" id="galeri"></div>
+    <p class="galeri-ipucu" id="galeriIpucu" hidden></p>
+    <div class="bolum-alt">
+      <button type="button" class="zarif-dugme" data-git="mektup">A Letter for You ♡</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 3. bölüm: mektup ============ -->
+<section id="bolum-mektup" class="bolum" tabindex="-1" aria-label="A Letter for You" aria-hidden="true" inert>
+  <div class="mektup-isik" id="mektupIsik" aria-hidden="true"></div>
+  <div class="mektup-sahne">
+    <div class="zarf-kutu" id="zarfKutu">
+      <button type="button" class="zarf" id="zarf" aria-label="Open the letter">
+        <span class="zarf-arka"></span><span class="zarf-kagit"></span><svg class="zarf-on" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="zarfOnBoya" x1="0.15" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#92162f"/><stop offset="1" stop-color="#581020"/></linearGradient></defs><polygon points="0,0 50,56 100,0 100,100 0,100" fill="url(#zarfOnBoya)"/><polyline points="0,0 50,56 100,0" fill="none" stroke="rgba(255,190,200,0.16)" stroke-width="1" vector-effect="non-scaling-stroke"/></svg><span class="zarf-kapak"></span><span class="muhur">♡</span>
+      </button>
+      <p class="zarf-ipucu">tap to open</p>
+    </div>
+
+    <article class="mektup" id="mektup" aria-label="A letter for Sena">
+      <!-- ============================================================
+           MEKTUBU BURADAN DÜZENLE / EDIT YOUR LETTER HERE
+           - Her <p class="rev"> bir paragraftır; yenisini eklemek için satırı kopyala.
+           - Each <p class="rev"> is one paragraph; copy a line to add more.
+           - Satırlar sırayla, yumuşak bir şekilde belirir.
+           ============================================================ -->
+      <p class="selam rev">Dear Sena,</p>
+      <div id="mektupMetni">
+        <p class="rev">This is where my letter to you will live. Every word on this page is meant for you and for no one else.</p>
+        <p class="rev">Replace these lines with everything I want you to know: the small things, the big things, and all the things in between.</p>
+        <p class="rev">Until then, know that every rose in this little world was grown for you.</p>
+      </div>
+      <p class="imza-mektup rev">By Asaf, for Sena. ♡</p>
+      <!-- ============================================================ -->
+    </article>
+
+    <div class="mektup-gezinme" id="mektupGezinme">
+      <button type="button" class="zarif-dugme" data-git="anilar">← Our Memories</button>
+      <button type="button" class="zarif-dugme" data-git="gul">Back to the Roses</button>
+    </div>
+  </div>
+</section>
+
+<!-- fotoğraf büyük görünümü -->
+<div class="isik-kutusu" id="isikKutusu" role="dialog" aria-modal="true" aria-label="Photo viewer" aria-hidden="true" inert>
+  <button type="button" class="ik-dugme ik-kapat" id="ikKapat" aria-label="Close">×</button>
+  <button type="button" class="ik-dugme ik-onceki" id="ikOnceki" aria-label="Previous photo">‹</button>
+  <figure class="ik-polaroid">
+    <img id="ikResim" alt="">
+    <figcaption id="ikYazi"></figcaption>
+  </figure>
+  <button type="button" class="ik-dugme ik-sonraki" id="ikSonraki" aria-label="Next photo">›</button>
+  <div class="ik-sayac" id="ikSayac"></div>
+</div>
 
 <script>
 /* =====================================================================
@@ -914,6 +1330,324 @@ if (kayitModu) {
     yenidenBaslat();      // gül animasyonu 0. saniyeden başlar
     cal();                // tıklama anında çalmayı başlat (tarayıcı izni için)
   });
+})();
+</script>
+
+<script>
+/* =====================================================================
+   BÖLÜMLER: güller → anılar → mektup
+   Gül ve müzik kodlarına dokunmaz. Ses öğesi (#muzik) hiç yeniden
+   oluşturulmaz; bölümler sadece üst üste açılıp kapanan katmanlardır.
+   ===================================================================== */
+
+/* ---------- FOTOĞRAFLAR: buradan düzenle ----------
+   Dosyaları assets/photos/ klasörüne koy. Olmayan dosyalar sessizce atlanır.
+   yazi: fotoğrafın altındaki kısa not (boş bırakılabilir)
+   tarih: küçük tarih yazısı (boş bırakılabilir), ör. '14 Şubat 2025' */
+const FOTO_KLASORU = 'assets/photos/';
+const FOTOGRAFLAR = [
+  { dosya: 'photo-01.jpg', yazi: '', tarih: '' },
+  { dosya: 'photo-02.jpg', yazi: '', tarih: '' },
+  { dosya: 'photo-03.jpg', yazi: '', tarih: '' },
+  { dosya: 'photo-04.jpg', yazi: '', tarih: '' },
+  { dosya: 'photo-05.jpg', yazi: '', tarih: '' },
+  { dosya: 'photo-06.jpg', yazi: '', tarih: '' },
+  { dosya: 'photo-07.jpg', yazi: '', tarih: '' },
+  { dosya: 'photo-08.jpg', yazi: '', tarih: '' },
+  { dosya: 'photo-09.jpg', yazi: '', tarih: '' },
+  { dosya: 'photo-10.jpg', yazi: '', tarih: '' },
+  { dosya: 'photo-11.jpg', yazi: '', tarih: '' },
+  { dosya: 'photo-12.jpg', yazi: '', tarih: '' },
+  { dosya: 'photo-13.jpg', yazi: '', tarih: '' },
+  { dosya: 'photo-14.jpg', yazi: '', tarih: '' },
+  { dosya: 'photo-15.jpg', yazi: '', tarih: '' }
+];
+
+(function () {
+  const $ = id => document.getElementById(id);
+  const giris = $('giris'), gezinme = $('gezinme');
+  const bolumAnilar = $('bolum-anilar'), bolumMektup = $('bolum-mektup'), isikKutusu = $('isikKutusu');
+
+  // kayıt modunda (?kayit) ek arayüz yok: kayıt davranışı aynı kalır
+  if (kayitModu) {
+    [giris, gezinme, bolumAnilar, bolumMektup, isikKutusu].forEach(e => e.remove());
+    return;
+  }
+
+  const govde = document.body;
+  const BOLUMLER = { anilar: bolumAnilar, mektup: bolumMektup };
+  const HASH = { gul: '', anilar: '#memories', mektup: '#letter' };
+  let aktif = 'gul', bitti = false, durakla = false, durakSayac = 0;
+
+  /* ---------- gül sahnesi: bitişi algıla, gerekirse çizimi durdur ---------- */
+  const cizOrijinal = ciz;
+  ciz = function (zaman, dt) {
+    if (durakla) return;                       // gül sahnesi görünmüyorken çizme (pil tasarrufu)
+    cizOrijinal(zaman, dt);
+    if (!govde.classList.contains('basladi')) return;   // karşılama ekranı arkasında sayma
+    if (!bitti && zaman > SON_ACILMA + 0.3) gulBitti();
+    else if (bitti && zaman < SON_ACILMA - 1) gulSifirla();   // güller yeniden başlatıldı
+  };
+
+  function yerlesimiHesapla() {
+    // güller bitince sahne biraz yukarı çıkıp küçülür; mesaj ve düğme alttaki boşluğa oturur
+    const gTop = giris.getBoundingClientRect().top;
+    const yaziYuksekligi = yazi ? Math.max(24, olcek * 3.5) + yaziKutusu.offsetHeight : 0;
+    const hedefAlt = gTop - 14 - yaziYuksekligi;
+    const dogalUst = merkezY - 62 * olcek, dogalAlt = merkezY + 58 * olcek, orta = H / 2;
+    let s = Math.min(0.94, (hedefAlt - 56) / (dogalAlt - dogalUst));
+    s = Math.max(0.55, s);
+    const dy = Math.min(0, hedefAlt - (orta + (dogalAlt - orta) * s));
+    const yeniAlt = orta + (dogalAlt - orta) * s + dy;
+    const st = govde.style;
+    st.setProperty('--gul-s', s.toFixed(4));
+    st.setProperty('--gul-dy', dy.toFixed(1) + 'px');
+    st.setProperty('--yazi-dy', (yeniAlt - dogalAlt).toFixed(1) + 'px');
+  }
+  function gulBitti() {
+    bitti = true;
+    yerlesimiHesapla();
+    govde.classList.add('gul-bitti', 'gezinme-acik');
+    if (aktif === 'gul') giris.classList.add('gorunur');
+  }
+  function gulSifirla() {
+    bitti = false;
+    govde.classList.remove('gul-bitti');
+    giris.classList.remove('gorunur');
+  }
+  window.addEventListener('resize', () => { if (bitti) yerlesimiHesapla(); });
+
+  /* ---------- bölüm geçişleri ---------- */
+  function uygula(b) {
+    isikKutusunuKapat();
+    aktif = b;
+    govde.dataset.bolum = b;
+    Object.keys(BOLUMLER).forEach(k => {
+      const el = BOLUMLER[k], ac = k === b;
+      el.classList.toggle('aktif', ac);
+      el.inert = !ac;
+      el.setAttribute('aria-hidden', ac ? 'false' : 'true');
+    });
+    clearTimeout(durakSayac);
+    if (b === 'gul') durakla = false;
+    else durakSayac = setTimeout(() => { if (aktif !== 'gul') durakla = true; }, AZALTILMIS_HAREKET ? 50 : 1300);
+
+    giris.classList.toggle('gorunur', b === 'gul' && bitti);
+    if (b !== 'gul' || bitti) govde.classList.add('gezinme-acik');
+    gezinme.querySelectorAll('button').forEach(d => {
+      if (d.dataset.git === b) d.setAttribute('aria-current', 'page'); else d.removeAttribute('aria-current');
+    });
+    if (b === 'anilar') anilariHazirla();
+    if (BOLUMLER[b]) BOLUMLER[b].focus({ preventScroll: true });
+    else if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  }
+  function git(b) {
+    if (b === aktif) return;
+    uygula(b);
+    const url = location.pathname + location.search + HASH[b];
+    try { history.pushState({ b: b }, '', url); }
+    catch (e) { try { location.hash = HASH[b]; } catch (e2) { /* geçmiş kaydı yoksa sorun değil */ } }
+  }
+  window.addEventListener('popstate', () => {
+    if (!govde.classList.contains('basladi')) return;
+    const b = location.hash === '#memories' ? 'anilar' : location.hash === '#letter' ? 'mektup' : 'gul';
+    uygula(b);
+  });
+  document.querySelectorAll('[data-git]').forEach(d => d.addEventListener('click', () => git(d.dataset.git)));
+
+  // "Open with music" tıklanınca: adres #memories / #letter ise doğrudan o bölüme git
+  $('muzikAc').addEventListener('click', () => {
+    const b = location.hash === '#memories' ? 'anilar' : location.hash === '#letter' ? 'mektup' : 'gul';
+    if (b !== 'gul') uygula(b);
+  });
+
+  /* ---------- yeni arayüzdeki tıklamalar gülleri yeniden başlatmasın ----------
+     Orijinal click/dblclick/Space dinleyicileri window'da; document onlardan önce çalışır. */
+  const arayuz = '#giris, #gezinme';
+  const arayuzde = e => e.target && e.target.closest && e.target.closest(arayuz);
+  const engelle = e => { if (aktif !== 'gul' || arayuzde(e)) e.stopPropagation(); };
+  document.addEventListener('click', engelle);
+  document.addEventListener('dblclick', engelle);
+  document.addEventListener('keydown', e => {
+    if (e.code === 'Space' && (aktif !== 'gul' || arayuzde(e))) e.stopPropagation();
+  });
+
+  /* ---------- galeri ---------- */
+  const galeri = $('galeri'), ipucu = $('galeriIpucu');
+  const DONUS = [-3.4, 2.3, -1.5, 3.5, -2.4, 1.3, -3, 2.7, -1.1, 3.1, -2.8, 1.8, -3.6, 2.1, -1.8];
+  const KAYMA = [0, 14, -6, 10, 4, -8, 12];
+  let galeriBasladi = false, ikListe = [], ikIndex = 0, ikOdak = null;
+
+  function fotoYukle(f) {
+    return new Promise(coz => {
+      const im = new Image();
+      im.decoding = 'async';
+      im.onload = () => coz(im.naturalWidth > 0 ? im : null);
+      im.onerror = () => coz(null);
+      im.src = FOTO_KLASORU + f.dosya;
+    });
+  }
+  function yaziEkle(fig, yazi, tarih) {
+    const cap = document.createElement('figcaption');
+    if (yazi) { const d = document.createElement('div'); d.textContent = yazi; cap.appendChild(d); }
+    if (tarih) { const d = document.createElement('div'); d.className = 'tarih'; d.textContent = tarih; cap.appendChild(d); }
+    fig.appendChild(cap);
+  }
+  function kartYap(i, bos) {
+    const k = document.createElement('figure');
+    k.className = 'polaroid' + (bos ? ' bos' : '');
+    k.style.setProperty('--r', DONUS[i % DONUS.length] + 'deg');
+    k.style.setProperty('--y', KAYMA[i % KAYMA.length] + 'px');
+    return k;
+  }
+  function galeriKur(liste) {
+    liste.forEach((f, i) => {
+      const k = kartYap(i, false);
+      k.tabIndex = 0; k.setAttribute('role', 'button');
+      k.setAttribute('aria-label', 'Open photo ' + (i + 1) + (f.yazi ? ': ' + f.yazi : ''));
+      const kutu = document.createElement('div'); kutu.className = 'foto';
+      const img = document.createElement('img');
+      img.alt = f.yazi || 'Photo ' + (i + 1); img.decoding = 'async'; img.src = f.src;
+      const goster = () => img.classList.add('hazir');
+      if (img.complete) goster(); else img.addEventListener('load', goster);
+      kutu.appendChild(img); k.appendChild(kutu);
+      yaziEkle(k, f.yazi, f.tarih);
+      k.addEventListener('click', () => isikKutusunuAc(i));
+      k.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.code === 'Space') { e.preventDefault(); isikKutusunuAc(i); }
+      });
+      galeri.appendChild(k);
+    });
+  }
+  function yerTutucular() {
+    for (let i = 0; i < 6; i++) {
+      const k = kartYap(i, true);
+      const kutu = document.createElement('div'); kutu.className = 'foto';
+      kutu.innerHTML = '<b>♡</b><span>your photo here</span>';
+      k.appendChild(kutu);
+      yaziEkle(k, 'photo-0' + (i + 1) + '.jpg', '');
+      galeri.appendChild(k);
+    }
+  }
+  function kartlariGozle() {
+    const kartlar = galeri.querySelectorAll('.polaroid:not(.gor)');
+    if (!('IntersectionObserver' in window)) { kartlar.forEach(k => k.classList.add('gor')); return; }
+    const io = new IntersectionObserver(es => es.forEach(e => {
+      if (e.isIntersecting) { e.target.classList.add('gor'); io.unobserve(e.target); }
+    }), { root: bolumAnilar, threshold: 0.12, rootMargin: '0px 0px -4% 0px' });
+    kartlar.forEach((k, i) => { k.style.setProperty('--d', (i % 3) * 0.12 + 's'); io.observe(k); });
+  }
+  function anilariHazirla() {
+    if (galeriBasladi) return;
+    galeriBasladi = true;
+    ipucu.hidden = false; ipucu.textContent = 'Gathering our memories…';
+    // önce hangi fotoğraflar var bak: olmayanlar sessizce atlanır, boşluk bırakmaz
+    Promise.all(FOTOGRAFLAR.map(fotoYukle)).then(sonuc => {
+      ikListe = [];
+      sonuc.forEach((im, i) => {
+        if (im) ikListe.push({ src: im.src, yazi: FOTOGRAFLAR[i].yazi || '', tarih: FOTOGRAFLAR[i].tarih || '' });
+      });
+      if (ikListe.length) { galeriKur(ikListe); ipucu.hidden = true; }
+      else {
+        yerTutucular();
+        ipucu.textContent = 'Add your photos to assets/photos/ (photo-01.jpg, photo-02.jpg, …) and they will appear here.';
+      }
+      setTimeout(kartlariGozle, 450);
+    });
+  }
+
+  /* ---------- fotoğraf büyük görünümü ---------- */
+  const ikResim = $('ikResim'), ikYazi = $('ikYazi'), ikSayac = $('ikSayac');
+  const ikOnceki = $('ikOnceki'), ikSonraki = $('ikSonraki'), ikKapat = $('ikKapat');
+
+  function ikGoster() {
+    const f = ikListe[ikIndex];
+    ikResim.style.opacity = 0;
+    ikResim.onload = () => { ikResim.style.opacity = 1; };
+    ikResim.src = f.src;
+    ikResim.alt = f.yazi || 'Photo ' + (ikIndex + 1);
+    setTimeout(() => { ikResim.style.opacity = 1; }, 700);
+    ikYazi.textContent = '';
+    if (f.yazi) { const d = document.createElement('div'); d.textContent = f.yazi; ikYazi.appendChild(d); }
+    if (f.tarih) { const d = document.createElement('div'); d.className = 'tarih'; d.textContent = f.tarih; ikYazi.appendChild(d); }
+    ikSayac.textContent = (ikIndex + 1) + ' / ' + ikListe.length;
+    const cok = ikListe.length > 1;
+    ikOnceki.hidden = ikSonraki.hidden = !cok;
+    if (cok) {   // komşu fotoğrafları önceden yükle
+      new Image().src = ikListe[(ikIndex + 1) % ikListe.length].src;
+      new Image().src = ikListe[(ikIndex - 1 + ikListe.length) % ikListe.length].src;
+    }
+  }
+  function ikGit(yon) {
+    if (ikListe.length < 2) return;
+    ikIndex = (ikIndex + yon + ikListe.length) % ikListe.length;
+    ikGoster();
+  }
+  function isikKutusunuAc(i) {
+    ikIndex = i; ikOdak = document.activeElement;
+    ikGoster();
+    isikKutusu.inert = false; isikKutusu.setAttribute('aria-hidden', 'false');
+    isikKutusu.classList.add('acik'); govde.classList.add('ik-acik');
+    ikKapat.focus({ preventScroll: true });
+  }
+  function isikKutusunuKapat(odakVerme) {
+    if (!isikKutusu.classList.contains('acik')) return;
+    isikKutusu.classList.remove('acik'); govde.classList.remove('ik-acik');
+    isikKutusu.inert = true; isikKutusu.setAttribute('aria-hidden', 'true');
+    if (!odakVerme && ikOdak && ikOdak.focus) ikOdak.focus({ preventScroll: true });
+  }
+  ikKapat.addEventListener('click', () => isikKutusunuKapat());
+  ikOnceki.addEventListener('click', () => ikGit(-1));
+  ikSonraki.addEventListener('click', () => ikGit(1));
+  isikKutusu.addEventListener('click', e => { if (e.target === isikKutusu) isikKutusunuKapat(); });
+  document.addEventListener('keydown', e => {
+    if (!isikKutusu.classList.contains('acik')) return;
+    if (e.key === 'Escape') isikKutusunuKapat();
+    else if (e.key === 'ArrowLeft') ikGit(-1);
+    else if (e.key === 'ArrowRight') ikGit(1);
+  });
+  let dokunX = null;
+  isikKutusu.addEventListener('touchstart', e => { dokunX = e.changedTouches[0].clientX; }, { passive: true });
+  isikKutusu.addEventListener('touchend', e => {
+    if (dokunX === null) return;
+    const dx = e.changedTouches[0].clientX - dokunX; dokunX = null;
+    if (Math.abs(dx) > 50) ikGit(dx < 0 ? 1 : -1);
+  }, { passive: true });
+
+  /* ---------- mektup ---------- */
+  const zarf = $('zarf'), zarfKutu = $('zarfKutu'), mektup = $('mektup'), mektupGezinme = $('mektupGezinme');
+  const isikTozu = $('mektupIsik');
+  for (let i = 0; i < 16; i++) {          // mektup bölümünün arkasında yükselen yumuşak ışıklar
+    const p = document.createElement('i');
+    p.style.setProperty('--x', (Math.random() * 100).toFixed(1) + '%');
+    p.style.setProperty('--s', (4 + Math.random() * 7).toFixed(1) + 'px');
+    p.style.setProperty('--t', (11 + Math.random() * 10).toFixed(1) + 's');
+    p.style.setProperty('--d', (-Math.random() * 18).toFixed(1) + 's');
+    p.style.setProperty('--k', ((Math.random() - 0.5) * 80).toFixed(0) + 'px');
+    isikTozu.appendChild(p);
+  }
+  let zarfAcildi = false;
+  zarf.addEventListener('click', () => {
+    if (zarfAcildi) return;
+    zarfAcildi = true;
+    zarfKutu.classList.add('acildi');
+    zarf.setAttribute('aria-label', 'Letter opened');
+    setTimeout(mektubuGoster, AZALTILMIS_HAREKET ? 80 : 2300);
+  });
+  function mektubuGoster() {
+    zarfKutu.classList.add('gitti');
+    setTimeout(() => {
+      zarfKutu.hidden = true;
+      mektup.style.display = 'block';
+      const satirlar = mektup.querySelectorAll('.rev');
+      satirlar.forEach((s, i) => s.style.setProperty('--i', i));
+      bolumMektup.scrollTop = 0;
+      void mektup.offsetWidth;            // geçişin başlaması için yerleşimi zorla
+      mektup.classList.add('acik');
+      const bitis = AZALTILMIS_HAREKET ? 200 : ((satirlar.length - 1) * 0.9 + 0.6 + 1.6) * 1000;
+      setTimeout(() => mektupGezinme.classList.add('goster'), bitis);
+    }, AZALTILMIS_HAREKET ? 0 : 700);
+  }
 })();
 </script>
 </body>
